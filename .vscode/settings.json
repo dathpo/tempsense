@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.ansi": "ansi",
+        "uuid.h": "c"
+    }
+}
