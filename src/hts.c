@@ -26,8 +26,6 @@
 
 LOG_MODULE_REGISTER(hts, LOG_LEVEL_INF);
 
-static const struct device *temp_dev = DEVICE_DT_GET_ANY(nordic_nrf_temp);
-
 static uint8_t simulate_htm;
 static uint8_t indicating;
 static struct bt_gatt_indicate_params ind_params;
@@ -56,55 +54,16 @@ BT_GATT_SERVICE_DEFINE(hts_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_HTS),
 					   /* more optional Characteristics */
 );
 
-void hts_init(void)
+void hts_indicate(double temperature)
 {
-	if (temp_dev == NULL || !device_is_ready(temp_dev)) {
-		LOG_INF("no temperature device; using simulated data");
-		temp_dev = NULL;
-	} else {
-		LOG_INF("temp device is %p, name is %s", temp_dev, temp_dev->name);
-	}
-}
-
-void hts_indicate(void)
-{
-	/* Temperature measurements simulation */
-	struct sensor_value temp_value;
-
 	if (simulate_htm) {
 		static uint8_t htm[5];
-		static double temperature = 20U;
 		uint32_t mantissa;
 		uint8_t exponent;
-		int r;
 
 		if (indicating) {
 			return;
 		}
-
-		if (!temp_dev) {
-			temperature++;
-			if (temperature == 30U) {
-				temperature = 20U;
-			}
-
-			goto gatt_indicate;
-		}
-
-		r = sensor_sample_fetch(temp_dev);
-		if (r) {
-			LOG_INF("sensor_sample_fetch failed return: %d", r);
-		}
-
-		r = sensor_channel_get(temp_dev, SENSOR_CHAN_DIE_TEMP, &temp_value);
-		if (r) {
-			LOG_INF("sensor_channel_get failed return: %d", r);
-		}
-
-		temperature = sensor_value_to_double(&temp_value);
-
-	gatt_indicate:
-		LOG_INF("temperature is %gC", temperature);
 
 		mantissa = (uint32_t)(temperature * 100);
 		exponent = (uint8_t)-2;

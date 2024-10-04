@@ -21,6 +21,7 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/types.h>
 
+#include "gpio.h"
 #include "hts.h"
 
 LOG_MODULE_REGISTER(tempsense, LOG_LEVEL_INF);
@@ -56,8 +57,6 @@ static void bt_ready(void)
 
 	LOG_INF("Bluetooth initialized");
 
-	hts_init();
-
 	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
 		LOG_INF("Advertising failed to start (err %d)", err);
@@ -84,6 +83,8 @@ int main(void)
 {
 	int err;
 
+	gpio_init();
+
 	err = bt_enable(NULL);
 	if (err) {
 		LOG_INF("Bluetooth init failed (err %d)", err);
@@ -101,7 +102,7 @@ int main(void)
 		k_sleep(K_SECONDS(1));
 
 		/* Temperature measurements simulation */
-		hts_indicate();
+		hts_indicate(gpio_get_temp());
 	}
 	return 0;
 }
