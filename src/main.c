@@ -26,11 +26,20 @@
 
 LOG_MODULE_REGISTER(tempsense, LOG_LEVEL_INF);
 
+#define MIN_ADV_INTERVAL 1999
+#define MAX_ADV_INTERVAL 2001
+#define ADV_INTERVAL_MULTIPLIER 0.625
+
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	BT_DATA_BYTES(BT_DATA_UUID16_ALL, BT_UUID_16_ENCODE(BT_UUID_HTS_VAL),
 				  BT_UUID_16_ENCODE(BT_UUID_DIS_VAL)),
 };
+
+static struct bt_le_adv_param adv_param =
+		BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONNECTABLE | BT_LE_ADV_OPT_USE_NAME,
+							 MIN_ADV_INTERVAL / ADV_INTERVAL_MULTIPLIER,
+							 MAX_ADV_INTERVAL / ADV_INTERVAL_MULTIPLIER, NULL);
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {
@@ -57,7 +66,7 @@ static void bt_ready(void)
 
 	LOG_INF("Bluetooth initialized");
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), NULL, 0);
+	err = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
 		LOG_INF("Advertising failed to start (err %d)", err);
 		return;
