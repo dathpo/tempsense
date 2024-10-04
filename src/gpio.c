@@ -9,6 +9,7 @@
 LOG_MODULE_REGISTER(gpio, LOG_LEVEL_INF);
 
 #define BUTTON_NODE DT_NODELABEL(button)
+#define POWER_KILL_PIN DT_NODELABEL(power_kill_pin)
 
 #define GREEN_LED_PWM_PCT 100U
 #define AMBER_LED_PWM_PCT 30U
@@ -23,8 +24,12 @@ enum led_colour {
 static void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
 static void button_released(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
 static void led_timer_timeout_cb(struct k_timer *timer);
+static void long_button_press_timeout_cb(struct k_timer *timer);
+static void long_button_press_cb(struct k_work *work);
 
 K_TIMER_DEFINE(led_timer, led_timer_timeout_cb, NULL);
+K_TIMER_DEFINE(long_button_press_timer, long_button_press_timeout_cb, NULL);
+K_WORK_DEFINE(long_button_press_work, long_button_press_cb);
 
 static const struct gpio_dt_spec button_node = GPIO_DT_SPEC_GET(BUTTON_NODE, gpios);
 static const struct pwm_dt_spec green_pwm_led = PWM_DT_SPEC_GET(DT_NODELABEL(green_led_pwm));
@@ -32,6 +37,7 @@ static const struct pwm_dt_spec amber_pwm_led = PWM_DT_SPEC_GET(DT_NODELABEL(yel
 static const struct device *pwm_leds_dev = DEVICE_DT_GET(DT_PARENT(DT_NODELABEL(green_led_pwm)));
 static const struct device *temp_dev = DEVICE_DT_GET_ANY(nordic_nrf_temp);
 static struct gpio_callback button_cb_data;
+static const struct gpio_dt_spec pwr_kill_pin = GPIO_DT_SPEC_GET(POWER_KILL_PIN, gpios);
 
 /**************************************************************************************************
  * FUNCTIONS
@@ -182,6 +188,7 @@ static void button_pressed(const struct device *dev, struct gpio_callback *cb, u
 		gpio_amber_led_on();
 	}
 
+	k_timer_start(&long_button_press_timer, K_SECONDS(18), K_NO_WAIT);
 	k_timer_start(&led_timer, K_SECONDS(5), K_NO_WAIT);
 
 	configure_button_interrupt(button_released, false);
@@ -189,6 +196,8 @@ static void button_pressed(const struct device *dev, struct gpio_callback *cb, u
 
 static void button_released(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
+	k_timer_stop(&long_button_press_timer);
+
 	configure_button_interrupt(button_pressed, true);
 }
 
@@ -196,4 +205,27 @@ static void led_timer_timeout_cb(struct k_timer *timer)
 {
 	(void)gpio_green_led_off();
 	(void)gpio_amber_led_off();
+}
+
+static void poweroff(void)
+{
+	LOG_INF("Powering system off");
+
+	int err = gpio_pin_configure_dt(&pwr_kill_pin, GPIO_OUTPUT_ACTIVE);
+	if (err != 0) {
+		LOG_ERR("Failed to set power kill signal, aborting power off. Error %d", err);
+	}
+}
+
+static void long_button_press_timeout_cb(struct k_timer *timer)
+{
+	int err = k_work_submit(&long_button_press_work);
+	if (err < 0) {
+		LOG_ERR("Failed to submit work of executing long button press event, error %d", err);
+	}
+}
+
+static void long_button_press_cb(struct k_work *work)
+{
+	poweroff();
 }
