@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.ansi": "ansi",
-        "uuid.h": "c"
+        "*.h": "c",
+        "*.c": "c"
     }
 }
